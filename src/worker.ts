@@ -1,5 +1,4 @@
 import { Router, html as HtmlResponse } from 'itty-router';
-import { Sentry } from '@borderless/worker-sentry';
 import { HTMLElement } from 'node-html-parser';
 import { httpEquiv } from './html';
 import { handleProfilePost, handleSubredditPost } from './endpoints/post';
@@ -7,13 +6,6 @@ import { handleShare } from './endpoints/share';
 import { getVideo } from './endpoints/video';
 import { GITHUB_LINK } from './constants';
 import { fallbackRedirect, getOriginalUrl, redirectPage } from './util';
-
-const sentry = new Sentry({
-    dsn: SENTRY_ENDPOINT,
-
-    // Performance Monitoring
-    // tracesSampleRate: 1.0, // Capture 100% of the transactions, reduce in production!
-});
 
 const router = Router();
 
@@ -58,26 +50,7 @@ router
 
 addEventListener('fetch', (event) => {
     event.respondWith(router.handle(event.request).catch((err) => {
-        // Extend the event lifetime until the response from Sentry has resolved.
-        // Docs: https://developers.cloudflare.com/workers/runtime-apis/fetch-event#methods
         console.error(err);
-        event.waitUntil(
-            // Sends a request to Sentry and returns the response promise.
-            sentry.captureException(err, {
-                tags: {
-                    level: 'handler',
-                },
-                request: {
-                    url: event.request.url,
-                    method: event.request.method,
-                    headers: Object.fromEntries(event.request.headers.entries()),
-                },
-                user: {
-                    ip: event.request.headers.get('cf-connecting-ip') ?? undefined,
-                },
-            }).catch(console.error)
-        );
-
         // Respond to the original request while the error is being logged (above).
         const html = new HTMLElement('html', {});
         const head = html.appendChild(new HTMLElement('head', {}));
